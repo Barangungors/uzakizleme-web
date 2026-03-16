@@ -1,20 +1,16 @@
 // @ts-nocheck
 "use client";
-import React, { useState, useEffect } from 'react';
-import ReactPlayer from 'react-player';
-import { Socket } from 'socket.io-client';
+import React from 'react';
+import dynamic from 'next/dynamic';
+
+// 🚀 İŞTE YOUTUBE'U ENGELLEYEN DUVARI YIKAN KOD
+// Next.js'e "Bunu sadece tarayıcıda çalıştır" diyoruz (ssr: false)
+const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
 
 export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }) {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!isMounted) return null;
-
   return (
-    <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black border-4 border-red-500">
+    // Çerçeveyi YEŞİL yaptık. Yeşil yanınca YouTube gelecek!
+    <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black border-4 border-green-500">
       <ReactPlayer
         url={videoUrl}
         width="100%"
