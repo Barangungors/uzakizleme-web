@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { useVideoSync } from '../hooks/useVideoSync';
+// @ts-nocheck
+import React, { useRef, useState, useEffect } from 'react';
+import ReactPlayer from 'react-player';
 import { Socket } from 'socket.io-client';
 
 interface PlayerProps {
@@ -10,41 +11,78 @@ interface PlayerProps {
 }
 
 export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }: PlayerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [isHovered, setIsHovered] = useState(false);
+  const playerRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
 
-  useVideoSync(videoRef, socket, isHost);
+  useEffect(() => {
+    if (!socket || isHost) return;
 
-  const handleHostAction = (action: 'PLAY' | 'PAUSE' | 'SEEK') => {
-    if (!isHost || !socket || !videoRef.current) return;
-    socket.emit('host_action', { partyId, action, videoTime: videoRef.current.currentTime });
+    const handleSync = (state: any) => {
+      const player = playerRef.current;
+      if (!player) return;
+
+      const now = Date.now();
+      const expectedTime = state.videoTime + (now - state.lastUpdateEpoch) / 1000;
+      const currentTime = player.getCurrentTime();
+      const drift = expectedTime - currentTime;
+
+      setIsPlaying(state.isPlaying);
+
+      if (state.isPlaying) {
+        if (Math.abs(drift) > 2) {
+          player.seekTo(expectedTime, 'seconds');
+        } else if (drift > 0.05) {
+          setPlaybackRate(1.05); 
+        } else if (drift < -0.05) {
+          setPlaybackRate(0.95); 
+        } else {
+          setPlaybackRate(1.0);
+        }
+      } else {
+        if (Math.abs(drift) > 0.5) player.seekTo(state.videoTime, 'seconds');
+      }
+    };
+
+    socket.on('sync_update', handleSync);
+    return () => { socket.off('sync_update', handleSync); };
+  }, [socket, isHost]);
+
+  const handlePlay = () => {
+    setIsPlaying(true);
+    if (isHost && socket && playerRef.current) {
+      socket.emit('host_action', { partyId, action: 'PLAY', videoTime: playerRef.current.getCurrentTime() });
+    }
+  };
+
+  const handlePause = () => {
+    setIsPlaying(false);
+    if (isHost && socket && playerRef.current) {
+      socket.emit('host_action', { partyId, action: 'PAUSE', videoTime: playerRef.current.getCurrentTime() });
+    }
+  };
+
+  const handleSeek = (seconds: number) => {
+    if (isHost && socket) {
+      socket.emit('host_action', { partyId, action: 'SEEK', videoTime: seconds });
+    }
   };
 
   return (
-    <div 
-      className="relative w-full max-w-6xl mx-auto rounded-2xl overflow-hidden shadow-2xl bg-black group transition-all"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        className="w-full aspect-video object-contain"
-        onPlay={() => handleHostAction('PLAY')}
-        onPause={() => handleHostAction('PAUSE')}
-        onSeeked={() => handleHostAction('SEEK')}
-        controls={isHost}
-        disablePictureInPicture
+    <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black">
+      <ReactPlayer
+        ref={playerRef}
+        url={videoUrl}
+        width="100%"
+        height="100%"
+        playing={isPlaying}
+        controls={isHost} 
+        playbackRate={playbackRate}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onSeek={handleSeek}
       />
-      {!isHost && (
-        <div className="absolute inset-0 z-10 bg-transparent flex items-end p-4">
-          <div className={`transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-            <span className="bg-black/70 text-white text-sm px-3 py-1 rounded-full backdrop-blur-md">
-              Senkronize ediliyor...
-            </span>
-          </div>
-        </div>
-      )}
+      {!isHost && <div className="absolute inset-0 z-10 bg-transparent" />}
     </div>
   );
 }
