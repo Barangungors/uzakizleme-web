@@ -1,41 +1,58 @@
-const { Server } = require("socket.io");
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 
-// Bulut sunucusu kendi portunu (PORT) verir, vermezse 3001 kullanırız
-const PORT = process.env.PORT || 3002;
+const app = express();
+const server = http.createServer(app);
 
+// Köprünün (Socket.io) kapılarını Vercel'e ve dünyaya açıyoruz
 const io = new Server(server, {
   cors: {
-    origin: "*", // Her yerden gelen bağlantıya izin ver (Sihirli değnek!)
+    origin: "*", 
     methods: ["GET", "POST"]
   }
 });
 
-io.on("connection", (socket) => {
-  console.log("Yeni kullanıcı: ", socket.id);
+const PORT = process.env.PORT || 3001;
 
-  socket.on("join_party", ({ partyId }) => {
-    socket.join(partyId);
+io.on('connection', (socket) => {
+  console.log('✨ Bir kullanıcı bağlandı:', socket.id);
+
+  // Odaya katılma komutu
+  socket.on('join_party', (data) => {
+    socket.join(data.partyId);
+    console.log(`👥 ${socket.id} şu odaya girdi: ${data.partyId}`);
   });
 
-  socket.on("host_action", (data) => {
-    socket.to(data.partyId).emit("sync_update", {
-      isPlaying: data.action === 'PLAY',
+  // --- VİDEO DEĞİŞTİRME KOMUTU ---
+  socket.on('change_video', (data) => {
+    console.log(`🎥 Yeni video talebi: ${data.videoUrl}`);
+    // Odadaki herkese (isteyen hariç) yeni linki gönder
+    socket.to(data.partyId).emit('video_changed', data.videoUrl);
+  });
+
+  // VİDEO KONTROLLERİ (Oynat, Durdur, Sar)
+  socket.on('host_action', (data) => {
+    // Gelen komutu odadaki diğer herkese "Senkronizasyon Güncellemesi" olarak pasla
+    socket.to(data.partyId).emit('sync_update', {
+      action: data.action,
       videoTime: data.videoTime,
+      isPlaying: data.action === 'PLAY',
       lastUpdateEpoch: Date.now()
     });
   });
-  // --- YENİ EKLENEN KISIM: Video Değiştirme ---
-  socket.on("change_video", (data) => {
-    console.log(`🎥 Yeni video açıldı: ${data.videoUrl}`);
-    // Odadaki herkese (kendisi hariç) yeni linki gönder
-    socket.to(data.partyId).emit("video_changed", data.videoUrl);
-  });
-  // --------------------------------------------
 
-  socket.on("send_message", (data) => {
-    console.log("📥 Mesaj:", data.message.text);
-    io.to(data.partyId).emit("receive_message", data.message);
+  // MESAJLAŞMA (Chat)
+  socket.on('send_message', (data) => {
+    io.to(data.partyId).emit('receive_message', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('❌ Bir kullanıcı ayrıldı.');
   });
 });
 
-console.log(`🚀 Sunucu ${PORT} portunda çalışıyor...`);
+// Sunucuyu ayağa kaldırıyoruz
+server.listen(PORT, () => {
+  console.log(`🚀 Köprü (Sunucu) şu portta hazır: ${PORT}`);
+});
