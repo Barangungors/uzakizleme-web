@@ -13,7 +13,7 @@ const io = new Server(server, {
   }
 });
 
-const PORT = process.env.PORT || 3001;
+
 
 io.on('connection', (socket) => {
   console.log('✨ Bir kullanıcı bağlandı:', socket.id);
@@ -55,4 +55,10 @@ io.on('connection', (socket) => {
 // Sunucuyu ayağa kaldırıyoruz
 server.listen(PORT, () => {
   console.log(`🚀 Köprü (Sunucu) şu portta hazır: ${PORT}`);
+});
+// server.js en alt kısmı
+const PORT = process.env.PORT || 3001; // Render kendi portunu buraya otomatik koyar
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Sunucu hazır! Port: ${PORT}`);
 });
