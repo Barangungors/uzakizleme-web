@@ -14,9 +14,16 @@ export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }: 
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  
+  // YENİ: Next.js donmasını (kilitlenmeyi) çözen sihirli kod
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    if (!socket || isHost) return;
+    setIsMounted(true); // Sayfa güvenle yüklendiğinde oynatıcıya izin ver
+  }, []);
+
+  useEffect(() => {
+    if (!socket || isHost || !isMounted) return;
 
     const handleSync = (state: any) => {
       const player = playerRef.current;
@@ -46,7 +53,7 @@ export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }: 
 
     socket.on('sync_update', handleSync);
     return () => { socket.off('sync_update', handleSync); };
-  }, [socket, isHost]);
+  }, [socket, isHost, isMounted]);
 
   const handlePlay = () => {
     setIsPlaying(true);
@@ -67,6 +74,11 @@ export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }: 
       socket.emit('host_action', { partyId, action: 'SEEK', videoTime: seconds });
     }
   };
+
+  // Eğer sayfa henüz hazır değilse, hata vermek yerine geçici siyah bir ekran göster
+  if (!isMounted) {
+    return <div className="w-full aspect-video rounded-2xl bg-black shadow-2xl border border-gray-800 flex items-center justify-center text-gray-500">Oynatıcı yükleniyor...</div>;
+  }
 
   return (
     <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black">
