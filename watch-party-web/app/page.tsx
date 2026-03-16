@@ -9,7 +9,7 @@ export default function Home() {
 
   // Sayfa açıldığında sunucuya (köprüye) bağlan
   useEffect(() => {
-    const newSocket = io('http://localhost:3001'); // Adım 2'de yazdığımız sunucu
+   const newSocket = io('https://uzakizleme-web.onrender.com'); // Adım 2'de yazdığımız sunucu
     setSocket(newSocket);
     
     // Odaya katıl
