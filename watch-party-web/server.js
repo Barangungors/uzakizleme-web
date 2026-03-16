@@ -57,8 +57,9 @@ server.listen(PORT, () => {
   console.log(`🚀 Köprü (Sunucu) şu portta hazır: ${PORT}`);
 });
 // server.js en alt kısmı
-const PORT = process.env.PORT || 3001; // Render kendi portunu buraya otomatik koyar
+// server.js dosyasının en altı tam olarak böyle olsun:
+const PORT = process.env.PORT || 3001;
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Sunucu hazır! Port: ${PORT}`);
+  console.log(`🚀 Köprü hazır! Port: ${PORT}`);
 });
