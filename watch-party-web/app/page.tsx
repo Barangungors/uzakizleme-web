@@ -49,8 +49,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-950 p-4 md:p-8 flex flex-col items-center">
-      <h1 className="text-3xl text-white font-bold mb-6 tracking-wide">🎬 Uzaktan İzleme Odası</h1>
-      
+<h1 className="text-3xl text-white font-bold mb-6 tracking-wide">🎬 Baran'ın İzleme Odası</h1>      
       <div className="w-full max-w-7xl mb-6 bg-gray-900 p-4 rounded-xl border border-gray-700 shadow-lg">
         <form onSubmit={handleVideoChange} className="flex flex-col md:flex-row gap-3">
           <input 
