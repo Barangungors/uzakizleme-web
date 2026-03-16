@@ -2,32 +2,29 @@
 import { useEffect, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 import WatchPartyPlayer from '@/components/WatchPartyPlayer';
-import ChatPanel from '../components/ChatPanel';
+// Eğer ChatPanel hata verirse burayı '@/components/ChatPanel' olarak değiştir
+import ChatPanel from '../components/ChatPanel'; 
 
 export default function Home() {
-  const [socket, setSocket] = useState<Socket | null>(null);
+  // 🚀 İŞTE EKRANIN DONMASINI ENGELLEYEN SİHİRLİ KİLİT
+  const [isMounted, setIsMounted] = useState(false);
   
-  // Varsayılan videoyu artık bir YouTube videosu yapalım
-  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=bGsl1V6fx-4");
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
   const [newUrlInput, setNewUrlInput] = useState("");
 
   useEffect(() => {
-    // 1. KISITLAMALARI KALDIRDIK: Socket.io en iyi yolu kendisi bulsun
+    // Sayfa tamamen yüklendiğinde kilidi aç ve donmayı engelle!
+    setIsMounted(true);
+
     const newSocket = io('https://uzakizleme-web.onrender.com');
     
-    // 2. AJANLAR: Bağlantı durumunu bize bildirecek
-    newSocket.on('connect', () => {
-      console.log('✅ KÖPRÜYE BAĞLANILDI! Mükemmel. ID:', newSocket.id);
-    });
-
-    newSocket.on('connect_error', (err) => {
-      console.error('❌ BAĞLANTI KOPTU! Sebep:', err.message);
-    });
+    newSocket.on('connect', () => console.log('✅ Köprüye bağlanıldı!'));
 
     newSocket.emit('join_party', { partyId: 'oda-123' });
 
     newSocket.on('video_changed', (newUrl) => {
-      console.log('🎥 Sunucudan yeni video linki geldi:', newUrl);
+      console.log('🎥 Ekran güncelleniyor, yeni link:', newUrl);
       setVideoUrl(newUrl);
     });
 
@@ -38,12 +35,17 @@ export default function Home() {
 
   const handleVideoChange = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUrlInput.trim() || !socket) return; 
+    if (!newUrlInput.trim() || !socket) return;
     
     setVideoUrl(newUrlInput);
     socket.emit('change_video', { partyId: 'oda-123', videoUrl: newUrlInput });
     setNewUrlInput(""); 
   };
+
+  // 🚀 EKRAN KİLİTLİYKEN BEYAZ BİR YÜKLENİYOR EKRANI GÖSTER
+  if (!isMounted) {
+    return <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center font-bold text-2xl">Oda Yükleniyor... Kilit Açılıyor ⏳</div>;
+  }
 
   return (
     <main className="min-h-screen bg-gray-950 p-4 md:p-8 flex flex-col items-center">
@@ -53,7 +55,7 @@ export default function Home() {
         <form onSubmit={handleVideoChange} className="flex flex-col md:flex-row gap-3">
           <input 
             type="url" 
-            placeholder="Buraya yeni bir YouTube veya video linki yapıştırın..." 
+            placeholder="Buraya yeni bir YouTube linki yapıştırın..." 
             value={newUrlInput}
             onChange={(e) => setNewUrlInput(e.target.value)}
             className="flex-1 bg-gray-800 text-white px-4 py-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition"
