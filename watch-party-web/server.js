@@ -3,8 +3,11 @@ const { Server } = require("socket.io");
 // Bulut sunucusu kendi portunu (PORT) verir, vermezse 3001 kullanırız
 const PORT = process.env.PORT || 3002;
 
-const io = new Server(PORT, {
-  cors: { origin: "*" } 
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Her yerden gelen bağlantıya izin ver (Sihirli değnek!)
+    methods: ["GET", "POST"]
+  }
 });
 
 io.on("connection", (socket) => {
