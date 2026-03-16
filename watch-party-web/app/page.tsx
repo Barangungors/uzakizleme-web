@@ -12,18 +12,25 @@ export default function Home() {
   const [newUrlInput, setNewUrlInput] = useState("");
 
   useEffect(() => {
-    const newSocket = io('https://uzakizleme-web.onrender.com', {
-      transports: ['websocket'],
-      upgrade: false
-    });
+    // 1. KISITLAMALARI KALDIRDIK: Socket.io en iyi yolu kendisi bulsun
+    const newSocket = io('https://uzakizleme-web.onrender.com');
     
+    // 2. AJANLAR: Bağlantı durumunu bize bildirecek
+    newSocket.on('connect', () => {
+      console.log('✅ KÖPRÜYE BAĞLANILDI! Mükemmel. ID:', newSocket.id);
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('❌ BAĞLANTI KOPTU! Sebep:', err.message);
+    });
+
     newSocket.emit('join_party', { partyId: 'oda-123' });
 
     newSocket.on('video_changed', (newUrl) => {
+      console.log('🎥 Sunucudan yeni video linki geldi:', newUrl);
       setVideoUrl(newUrl);
     });
 
-    // 🚀 İŞTE GÜNLERDİR ARADIĞIMIZ EKSİK SATIR: Bağlantıyı hafızaya kaydediyoruz!
     setSocket(newSocket);
 
     return () => { newSocket.disconnect(); };
