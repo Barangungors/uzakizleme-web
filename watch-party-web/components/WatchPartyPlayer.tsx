@@ -83,7 +83,7 @@ export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }: 
 
   return (
     <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black">
-      <ReactPlayer
+   <ReactPlayer
         ref={playerRef}
         url={videoUrl}
         width="100%"
@@ -93,7 +93,6 @@ export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }: 
         playbackRate={playbackRate}
         onPlay={handlePlay}
         onPause={handlePause}
-        onSeek={handleSeek}
       />
       {!isHost && <div className="absolute inset-0 z-10 bg-transparent" />}
     </div>
