@@ -1,7 +1,11 @@
 // @ts-nocheck
 import React, { useRef, useState, useEffect } from 'react';
-import ReactPlayer from 'react-player';
+import dynamic from 'next/dynamic'; // YENİ: Dinamik import kütüphanesi
 import { Socket } from 'socket.io-client';
+
+// YENİ SİHİRLİ KOD: ReactPlayer'ı sadece tarayıcıda (Client) çalışacak şekilde yüklüyoruz.
+// Bu sayede Next.js "onSeek" hatasını vermez ve sistem kilitlenmez.
+const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
 
 interface PlayerProps {
   socket: Socket | null;
@@ -14,12 +18,10 @@ export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }: 
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
-  
-  // YENİ: Next.js donmasını (kilitlenmeyi) çözen sihirli kod
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true); // Sayfa güvenle yüklendiğinde oynatıcıya izin ver
+    setIsMounted(true);
   }, []);
 
   useEffect(() => {
@@ -75,7 +77,6 @@ export default function WatchPartyPlayer({ socket, videoUrl, isHost, partyId }: 
     }
   };
 
-  // Eğer sayfa henüz hazır değilse, hata vermek yerine geçici siyah bir ekran göster
   if (!isMounted) {
     return <div className="w-full aspect-video rounded-2xl bg-black shadow-2xl border border-gray-800 flex items-center justify-center text-gray-500">Oynatıcı yükleniyor...</div>;
   }
