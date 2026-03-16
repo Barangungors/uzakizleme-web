@@ -13,8 +13,10 @@ export default function Home() {
 
   useEffect(() => {
     // Kendi Render linkinin burada olduğundan emin ol!
-    const newSocket = io('https://uzakizleme-web.onrender.com'); 
-    setSocket(newSocket);
+    const newSocket = io('https://uzakizleme-web.onrender.com', {
+  transports: ['websocket'], // Sadece en hızlı yolu kullan
+  upgrade: false
+});
     
     newSocket.emit('join_party', { partyId: 'oda-123' });
 
