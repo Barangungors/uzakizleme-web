@@ -70,8 +70,6 @@ export default function Home() {
         <div className="flex-[3]">
           <WatchPartyPlayer 
             socket={socket} 
-            videoUrl={videoUrl} 
-            isHost={true} 
             partyId="oda-123"
           />
         </div>
