@@ -21,6 +21,13 @@ io.on("connection", (socket) => {
       lastUpdateEpoch: Date.now()
     });
   });
+  // --- YENİ EKLENEN KISIM: Video Değiştirme ---
+  socket.on("change_video", (data) => {
+    console.log(`🎥 Yeni video açıldı: ${data.videoUrl}`);
+    // Odadaki herkese (kendisi hariç) yeni linki gönder
+    socket.to(data.partyId).emit("video_changed", data.videoUrl);
+  });
+  // --------------------------------------------
 
   socket.on("send_message", (data) => {
     console.log("📥 Mesaj:", data.message.text);
