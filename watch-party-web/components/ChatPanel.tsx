@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-
+import { playSound } from '@/utils/sound'; // 🚀 Ses motorunu içeri aldık
 interface Message {
   sender: string;
   text: string;
@@ -21,11 +21,19 @@ export default function ChatPanel({ socket, partyId, username }: ChatPanelProps)
 
   useEffect(() => {
     if (!socket) return;
+    
     socket.on('receive_message', (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
+      
+      // 🚀 EĞER MESAJI BEN ATMADIYSAM "POP" SESİ ÇAL
+      if (msg.sender !== username) {
+        playSound('message');
+      }
     });
+    
     return () => { socket.off('receive_message'); };
-  }, [socket]);
+  }, [socket, username]);
+
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

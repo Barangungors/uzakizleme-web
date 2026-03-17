@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 import WatchPartyPlayer from '@/components/WatchPartyPlayer';
 import ChatPanel from '@/components/ChatPanel';
 import ScreenShare from '@/components/ScreenShare';
 import UserList from '@/components/UserList';
+import { playSound } from '@/utils/sound';
 
 export default function Home() {
   const [socket, setSocket] = useState<any>(null);
@@ -15,16 +16,28 @@ export default function Home() {
   const [inputUrl, setInputUrl] = useState("");
   const [hostId, setHostId] = useState("");
   const [users, setUsers] = useState<{id: string, name: string}[]>([]);
+  
+  // 🚀 Odadaki kişi sayısını hafızada tutmak için (Ses çalma kontrolü)
+  const prevUserCount = useRef(0);
 
   useEffect(() => {
-    // Sizin canlı Render linkiniz
+    // Senin 7/24 açık canlı Render sunucun
     const newSocket = io('https://watch-party-backend-84du.onrender.com');
     setSocket(newSocket);
     
     newSocket.on('room_state', (data) => {
       setVideoUrl(data.videoUrl);
       setHostId(data.hostId);
-      if (data.users) setUsers(data.users);
+      
+      if (data.users) {
+        // 🔔 Odaya YENİ biri girdiyse (ve ilk açılış değilse) "Ding-Dong" çal
+        if (prevUserCount.current > 0 && data.users.length > prevUserCount.current) {
+          playSound('join');
+        }
+        
+        prevUserCount.current = data.users.length; // Sayıyı güncelle
+        setUsers(data.users);
+      }
     });
 
     newSocket.on('video_changed', (data) => {
@@ -50,7 +63,7 @@ export default function Home() {
     }
   };
 
-  // --- GİRİŞ EKRANI (Aynı ama daha temiz) ---
+  // --- GİRİŞ EKRANI ---
   if (!joined) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -74,7 +87,7 @@ export default function Home() {
 
   const isHost = socket?.id === hostId;
 
-  // --- ANA ODA EKRANI (TAMAMEN YENİ DÜZEN) ---
+  // --- ANA ODA EKRANI ---
   return (
     <main className="min-h-screen bg-gray-950 p-6 md:p-10 flex flex-col items-center">
       
@@ -88,7 +101,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Video Değiştirme ve Güvenlik Kilidi Alanı (Daha dengeli) */}
+      {/* Video Değiştirme ve Güvenlik Kilidi Alanı */}
       <div className="w-full max-w-[1500px] mb-8">
         {isHost ? (
           <div className="flex gap-4 p-4 bg-gray-900 rounded-3xl border border-gray-800 shadow-xl animate-fade-in">
@@ -107,8 +120,9 @@ export default function Home() {
         )}
       </div>
 
-      {/* Video ve Sohbet Panelleri Yan Yana (Side-by-Side) */}
+      {/* Video, Ekran Paylaşımı, Kullanıcı Listesi ve Sohbet Panelleri */}
       <div className="w-full max-w-[1500px] grid grid-cols-1 lg:grid-cols-4 gap-8">
+        
         {/* SOL TARAF: VİDEO OYNATICI VE EKRAN PAYLAŞIMI (Geniş Alan) */}
         <div className="col-span-1 lg:col-span-3 flex flex-col gap-8">
           <WatchPartyPlayer socket={socket} videoUrl={videoUrl} partyId={partyId} hostId={hostId} />
@@ -121,7 +135,7 @@ export default function Home() {
           {/* UserList paneli */}
           <UserList users={users} hostId={hostId} myId={socket?.id} />
           
-          {/* ChatPanel paneli (Alanı dolduracak şekilde büyür) */}
+          {/* ChatPanel paneli */}
           <div className="flex-1 overflow-hidden">
             <ChatPanel socket={socket} partyId={partyId} username={username} />
           </div>
