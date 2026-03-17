@@ -4,7 +4,6 @@ import io, { Socket } from 'socket.io-client';
 import WatchPartyPlayer from '@/components/WatchPartyPlayer';
 import ChatPanel from '../components/ChatPanel';
 
-// 🛠 YouTube ID ayıklama fonksiyonu
 function getYouTubeId(url: string) {
   const regExp = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([^&\n?#]+)/;
   const match = url.match(regExp);
@@ -13,7 +12,9 @@ function getYouTubeId(url: string) {
 
 export default function Home() {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
+  
+  // 🚀 TEST LİNKİ BURAYA EKLENDİ
+  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=DzMrabVqiJE");
   const [newUrlInput, setNewUrlInput] = useState("");
 
   useEffect(() => {
@@ -22,9 +23,7 @@ export default function Home() {
     
     newSocket.emit('join_party', { partyId: 'oda-123' });
 
-    // Sunucudan gelen video değişimini dinle
     newSocket.on('video_changed', (newUrl) => {
-      console.log("🎥 Sunucudan emir geldi! Video değişiyor:", newUrl);
       setVideoUrl(newUrl);
     });
 
@@ -33,23 +32,13 @@ export default function Home() {
 
   const handleVideoChange = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("🔗 Link kontrol ediliyor:", newUrlInput);
-    
     const id = getYouTubeId(newUrlInput);
     
     if (id && socket) {
       const cleanUrl = `https://www.youtube.com/watch?v=${id}`;
-      console.log("✅ ID Bulundu:", id, "-> Sunucuya gönderiliyor...");
-      
-      // Server'a gönder (Server da herkese, bize dahil geri yollayacak)
-      socket.emit('change_video', { 
-        partyId: 'oda-123', 
-        videoUrl: cleanUrl 
-      });
-
+      socket.emit('change_video', { partyId: 'oda-123', videoUrl: cleanUrl });
       setNewUrlInput(""); 
     } else {
-      console.error("❌ Geçersiz link veya Socket bağlı değil!");
       alert("Lütfen geçerli bir YouTube linki yapıştırın!");
     }
   };
@@ -76,7 +65,6 @@ export default function Home() {
 
       <div className="w-full max-w-7xl flex flex-col md:flex-row gap-6">
         <div className="flex-[3]">
-          {/* Link değişimini zorlamak için 'key' ekledik */}
           <WatchPartyPlayer key={videoUrl} socket={socket} videoUrl={videoUrl} partyId="oda-123" />
         </div>
         <div className="flex-1">

@@ -5,45 +5,47 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// CORS Ayarları: Vercel sitemizin sunucuya bağlanmasına izin veriyoruz
+// 🛠 CORS AYARI: Vercel üzerindeki frontend sitenin buraya bağlanabilmesi için şart.
 const io = new Server(server, {
   cors: {
-    origin: "*", // Güvenlik için ileride buraya sadece vercel linkini yazabilirsin
+    origin: "*", // Geliştirme aşamasında her yerden bağlantıya izin veriyoruz.
     methods: ["GET", "POST"]
   }
 });
 
-// 🧠 ODA HAFIZASI: Sunucu açık kaldığı sürece odaların durumunu burada tutar
+// 🧠 ODA BELLEĞİ (Rooms): Sunucu açık olduğu sürece odaların bilgisini burada tutarız.
+// Gerçek bir uygulamada bunlar veritabanında tutulur ama şu an en hızlı çözüm bu.
 const rooms = {};
 
 io.on('connection', (socket) => {
-  console.log('✨ Bir kullanıcı bağlandı. ID:', socket.id);
+  console.log('✨ Yeni bir kullanıcı bağlandı. Kullanıcı ID:', socket.id);
 
-  // 1️⃣ ODAYA KATILMA (Room Logic)
+  // 1️⃣ ODAYA GİRİŞ VE SENKRONİZASYON (Madde 6)
   socket.on('join_party', ({ partyId }) => {
     socket.join(partyId);
-    console.log(`👤 ${socket.id} şu odaya girdi: ${partyId}`);
+    console.log(`👤 Kullanıcı ${socket.id}, şu odaya katıldı: ${partyId}`);
 
-    // Oda hafızada yoksa oluştur (Varsayılan video ile başlat)
+    // Oda ilk kez oluşturuluyorsa varsayılan ayarları yükle
     if (!rooms[partyId]) {
       rooms[partyId] = {
-        videoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+        // 🚀 İSTEDİĞİN VARSAYILAN VİDEO LİNKİ
+        videoUrl: "https://www.youtube.com/watch?v=DzMrabVqiJE",
         isPlaying: false,
         currentTime: 0,
         lastUpdatedAt: Date.now()
       };
     }
 
-    // 🔄 YENİ GELENİ SENKRONİZE ET (Madde 6)
     const room = rooms[partyId];
     let syncTime = room.currentTime;
 
-    // Eğer video şu an oynuyorsa, geçen süreyi hesapla (Zaman kaymasını engelle)
+    // Eğer oda şu an oynatılıyorsa, aradan geçen süreyi hesaplayıp yeni gelene veriyoruz (Drift engelleme)
     if (room.isPlaying) {
       const elapsed = (Date.now() - room.lastUpdatedAt) / 1000;
       syncTime += elapsed;
     }
 
+    // Odaya yeni giren kişiye odanın "canlı" durumunu gönder
     socket.emit('room_state', {
       videoUrl: room.videoUrl,
       isPlaying: room.isPlaying,
@@ -51,7 +53,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 2️⃣ VİDEO DEĞİŞTİRME (Madde 1, 3, 4)
+  // 2️⃣ VİDEO DEĞİŞTİRME (ID TABANLI SİSTEM - Madde 1-4)
   socket.on('change_video', ({ partyId, videoUrl }) => {
     if (rooms[partyId]) {
       rooms[partyId].videoUrl = videoUrl;
@@ -59,22 +61,22 @@ io.on('connection', (socket) => {
       rooms[partyId].isPlaying = false;
       rooms[partyId].lastUpdatedAt = Date.now();
     }
-    // Odadaki herkese yeni videoyu bildir
+    // Odadaki herkese (bize dahil) yeni videoyu yayınla
     io.to(partyId).emit('video_changed', videoUrl);
   });
 
-  // 3️⃣ PLAY (Oynat) KOMUTU
+  // 3️⃣ OYNAT (PLAY) KOMUTU (Madde 2)
   socket.on('play', ({ partyId, currentTime }) => {
     if (rooms[partyId]) {
       rooms[partyId].isPlaying = true;
       rooms[partyId].currentTime = currentTime;
       rooms[partyId].lastUpdatedAt = Date.now();
     }
-    // Gönderen kişi hariç odadaki herkese "oynat" de
+    // Komutu gönderen hariç odadaki diğer herkese "başlat" mesajı at
     socket.to(partyId).emit('play', currentTime);
   });
 
-  // 4️⃣ PAUSE (Durdur) KOMUTU
+  // 4️⃣ DURDUR (PAUSE) KOMUTU
   socket.on('pause', ({ partyId, currentTime }) => {
     if (rooms[partyId]) {
       rooms[partyId].isPlaying = false;
@@ -84,7 +86,7 @@ io.on('connection', (socket) => {
     socket.to(partyId).emit('pause', currentTime);
   });
 
-  // 5️⃣ SEEK (Sarma) KOMUTU (Madde 5)
+  // 5️⃣ VİDEOYU SARMA (SEEK) KOMUTU (Madde 5)
   socket.on('seek', ({ partyId, currentTime }) => {
     if (rooms[partyId]) {
       rooms[partyId].currentTime = currentTime;
@@ -93,7 +95,7 @@ io.on('connection', (socket) => {
     socket.to(partyId).emit('seek', currentTime);
   });
 
-  // 💬 SOHBET SİSTEMİ
+  // 💬 SOHBET MESAJLARI
   socket.on('send_message', (data) => {
     io.to(data.partyId).emit('receive_message', data);
   });
@@ -103,8 +105,8 @@ io.on('connection', (socket) => {
   });
 });
 
-// Render veya Heroku gibi servisler için PORT ayarı
+// Port Ayarı (Render gibi platformlar PORT'u kendisi atar)
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Watch Party Sunucusu ${PORT} portunda hazır!`);
+  console.log(`🚀 Watch Party Sunucusu ${PORT} portunda aslanlar gibi çalışıyor!`);
 });
