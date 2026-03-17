@@ -4,7 +4,7 @@ import io, { Socket } from 'socket.io-client';
 import WatchPartyPlayer from '@/components/WatchPartyPlayer';
 import ChatPanel from '../components/ChatPanel';
 
-// 1️⃣ YouTube ID çıkarma fonksiyonu (Senin verdiğin kod)
+// 🛠 YouTube ID ayıklama fonksiyonu
 function getYouTubeId(url: string) {
   const regExp = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([^&\n?#]+)/;
   const match = url.match(regExp);
@@ -19,33 +19,37 @@ export default function Home() {
   useEffect(() => {
     const newSocket = io('https://uzakizleme-web.onrender.com');
     setSocket(newSocket);
+    
     newSocket.emit('join_party', { partyId: 'oda-123' });
 
+    // Sunucudan gelen video değişimini dinle
     newSocket.on('video_changed', (newUrl) => {
+      console.log("🎥 Sunucudan emir geldi! Video değişiyor:", newUrl);
       setVideoUrl(newUrl);
     });
 
     return () => { newSocket.disconnect(); };
   }, []);
 
-  // 2️⃣ "Videoyu Değiştir" Butonuna Basıldığında Çalışacak Görev
   const handleVideoChange = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = getYouTubeId(newUrlInput); // ID'yi ayıkla
+    console.log("🔗 Link kontrol ediliyor:", newUrlInput);
+    
+    const id = getYouTubeId(newUrlInput);
     
     if (id && socket) {
-      // ID'den tertemiz bir YouTube linki oluştur
       const cleanUrl = `https://www.youtube.com/watch?v=${id}`;
+      console.log("✅ ID Bulundu:", id, "-> Sunucuya gönderiliyor...");
       
-      // 3️⃣ Socket.io ile server'a gönder
+      // Server'a gönder (Server da herkese, bize dahil geri yollayacak)
       socket.emit('change_video', { 
         partyId: 'oda-123', 
         videoUrl: cleanUrl 
       });
 
-      setVideoUrl(cleanUrl); // Kendi ekranını güncelle
-      setNewUrlInput(""); // Kutuyu temizle
+      setNewUrlInput(""); 
     } else {
+      console.error("❌ Geçersiz link veya Socket bağlı değil!");
       alert("Lütfen geçerli bir YouTube linki yapıştırın!");
     }
   };
@@ -58,13 +62,12 @@ export default function Home() {
         <form onSubmit={handleVideoChange} className="flex flex-col md:flex-row gap-3">
           <input 
             type="text" 
-            placeholder="YouTube linkini buraya yapıştırın (Shorts, Mobil vb. hepsi çalışır)" 
+            placeholder="YouTube linkini buraya yapıştırın..." 
             value={newUrlInput}
             onChange={(e) => setNewUrlInput(e.target.value)}
             className="flex-1 bg-gray-800 text-white px-4 py-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
-          {/* onBlur yerine buton onClick yöntemi */}
           <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-lg font-bold transition shadow-md">
             Videoyu Değiştir
           </button>
@@ -73,7 +76,8 @@ export default function Home() {
 
       <div className="w-full max-w-7xl flex flex-col md:flex-row gap-6">
         <div className="flex-[3]">
-          <WatchPartyPlayer socket={socket} videoUrl={videoUrl} partyId="oda-123" />
+          {/* Link değişimini zorlamak için 'key' ekledik */}
+          <WatchPartyPlayer key={videoUrl} socket={socket} videoUrl={videoUrl} partyId="oda-123" />
         </div>
         <div className="flex-1">
           <ChatPanel socket={socket} partyId="oda-123" username="Baran" />
