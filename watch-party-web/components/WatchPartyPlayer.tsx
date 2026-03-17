@@ -1,74 +1,40 @@
 // @ts-nocheck
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
-import dynamic from 'next/dynamic';
-
-const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
+import React, { useEffect, useState } from 'react';
 
 export default function WatchPartyPlayer({ socket, videoUrl, partyId }) {
-  const playerRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const [videoId, setVideoId] = useState("");
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    if (videoUrl) {
+      const regExp = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([^&\n?#]+)/;
+      const match = videoUrl.match(regExp);
+      if (match && match[1]) {
+        setVideoId(match[1]);
+      }
+    }
+  }, [videoUrl]);
 
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('play', (time) => {
-      setPlaying(true);
-      playerRef.current?.seekTo(time, 'seconds');
-    });
-
-    socket.on('pause', () => setPlaying(false));
-    socket.on('seek', (time) => playerRef.current?.seekTo(time, 'seconds'));
-
-    return () => {
-      socket.off('play'); socket.off('pause'); socket.off('seek');
-    };
-  }, [socket]);
-
-  if (!isMounted) return null;
+  if (!videoId) {
+    return (
+      <div className="w-full h-[450px] bg-gray-900 flex items-center justify-center text-white rounded-2xl border-4 border-green-500">
+        ⏳ YouTube Linki Bekleniyor...
+      </div>
+    );
+  }
 
   return (
-    <div 
-      key={videoUrl}
-      className="relative w-full rounded-2xl overflow-hidden bg-black border-4 border-green-500 shadow-2xl"
-      style={{ height: '450px', width: '100%', clear: 'both' }} // Net yükseklik verdik
-    >
-      <ReactPlayer
-        ref={playerRef}
-        url={videoUrl}
-        playing={playing}
-        controls={true}
+    <div className="relative w-full rounded-2xl overflow-hidden bg-black border-4 border-green-500 shadow-2xl" style={{ height: '450px' }}>
+      <iframe
         width="100%"
         height="100%"
-        // 🚀 KRİTİK AYAR: YouTube'un "Ben buradayım" demesini sağlıyor
-        config={{
-          youtube: {
-            playerVars: { 
-              origin: window.location.origin, // Kendi sitemizin adresini YouTube'a tanıtıyoruz
-              enablejsapi: 1,
-              modestbranding: 1,
-              rel: 0
-            }
-          }
-        }}
-        onPlay={() => {
-          setPlaying(true);
-          socket?.emit('play', { partyId, currentTime: playerRef.current?.getCurrentTime() });
-        }}
-        onPause={() => {
-          setPlaying(false);
-          socket?.emit('pause', { partyId, currentTime: playerRef.current?.getCurrentTime() });
-        }}
-        // Görüntü gelmezse diye konsola rapor versin
-        onReady={() => console.log("✅ YouTube Görüntüsü Başarıyla Yüklendi!")}
-        onError={(e) => console.log("❌ YouTube Yükleme Hatası:", e)}
+        src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+        title="YouTube video player"
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
         style={{ position: 'absolute', top: 0, left: 0 }}
-      />
+      ></iframe>
     </div>
   );
 }

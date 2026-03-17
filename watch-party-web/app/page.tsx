@@ -62,7 +62,8 @@ export default function Home() {
           </button>
         </form>
       </div>
-
+      
+    
       <div className="w-full max-w-7xl flex flex-col md:flex-row gap-6">
         <div className="flex-[3]">
           <WatchPartyPlayer key={videoUrl} socket={socket} videoUrl={videoUrl} partyId="oda-123" />
