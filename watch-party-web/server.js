@@ -1,8 +1,6 @@
-// server.js tam hali - "Oda Sahibi" Mantığıyla
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -10,58 +8,56 @@ const io = new Server(server, { cors: { origin: "*" } });
 const rooms = {};
 
 io.on('connection', (socket) => {
-  socket.on('join_party', ({ partyId }) => {
+  socket.on('join_party', ({ partyId, username }) => {
     socket.join(partyId);
-
+    
     if (!rooms[partyId]) {
       rooms[partyId] = {
         videoUrl: "https://www.youtube.com/watch?v=DzMrabVqiJE",
         isPlaying: false,
-        currentTime: 0,
-        hostId: socket.id, // 🚀 Odaya ilk giren kişi HOST (Sahip) olur
-        lastUpdatedAt: Date.now()
+        hostId: socket.id, // İlk giren Başkan (Host)
+        users: []
       };
     }
 
     const room = rooms[partyId];
-    
-    // Kullanıcıya hem oda durumunu hem de "Sen sahibi misin?" bilgisini yolla
-    socket.emit('room_state', {
+    room.users.push({ id: socket.id, name: username || `Kullanıcı_${socket.id.slice(0,4)}` });
+
+    // Odaya giren herkese güncel listeyi ve durumu yolla
+    io.to(partyId).emit('room_state', {
       videoUrl: room.videoUrl,
       isPlaying: room.isPlaying,
-      currentTime: room.currentTime,
-      isHost: room.hostId === socket.id // Sahip kontrolü
+      isHost: room.hostId === socket.id,
+      users: room.users
     });
   });
 
-  // Sadece HOST'tan gelen komutları dağıt (Güvenlik)
   socket.on('play', ({ partyId, currentTime }) => {
-    if (rooms[partyId] && rooms[partyId].hostId === socket.id) {
-      rooms[partyId].isPlaying = true;
-      rooms[partyId].currentTime = currentTime;
+    if (rooms[partyId]?.hostId === socket.id) {
       socket.to(partyId).emit('play', currentTime);
     }
   });
 
   socket.on('pause', ({ partyId }) => {
-    if (rooms[partyId] && rooms[partyId].hostId === socket.id) {
-      rooms[partyId].isPlaying = false;
+    if (rooms[partyId]?.hostId === socket.id) {
       socket.to(partyId).emit('pause');
     }
   });
 
-  socket.on('change_video', ({ partyId, videoUrl }) => {
-    if (rooms[partyId] && rooms[partyId].hostId === socket.id) {
-      rooms[partyId].videoUrl = videoUrl;
-      io.to(partyId).emit('video_changed', videoUrl);
-    }
-  });
-
   socket.on('disconnect', () => {
-    // Sahip çıkarsa odayı temizle veya başkasına devret (şimdilik basit tutuyoruz)
-    console.log("Kullanıcı ayrıldı");
+    // Odalardan kullanıcıyı temizle
+    for (const partyId in rooms) {
+      rooms[partyId].users = rooms[partyId].users.filter(u => u.id !== socket.id);
+      if (rooms[partyId].users.length === 0) {
+        delete rooms[partyId];
+      } else if (rooms[partyId].hostId === socket.id) {
+        // Sahip çıktıysa sıradaki kişiyi başkan yap
+        rooms[partyId].hostId = rooms[partyId].users[0].id;
+        io.to(partyId).emit('new_host', rooms[partyId].hostId);
+      }
+    }
   });
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, "0.0.0.0", () => console.log(`🚀 Sunucu ${PORT} aktif!`));
+server.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server ${PORT} aktif!`));
