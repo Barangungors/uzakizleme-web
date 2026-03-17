@@ -68,10 +68,11 @@ export default function Home() {
 
       <div className="w-full max-w-7xl flex flex-col md:flex-row gap-6 items-stretch">
         <div className="flex-[3]">
-          <WatchPartyPlayer 
-            socket={socket} 
-            partyId="oda-123"
-          />
+         <WatchPartyPlayer 
+  socket={socket} 
+  videoUrl={videoUrl} 
+  partyId="oda-123"
+/>
         </div>
         <div className="flex-1 flex">
           <ChatPanel 

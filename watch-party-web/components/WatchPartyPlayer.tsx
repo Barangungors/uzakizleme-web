@@ -3,16 +3,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
-// 🚀 DÜZELTİLEN SATIR BURASI: "/youtube" kısmını sildik, ana paketi çağırıyoruz.
 const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
 
-export default function WatchPartyPlayer({ socket, partyId }) {
+export default function WatchPartyPlayer({ socket, videoUrl, partyId }) {
   const playerRef = useRef(null);
   const [playing, setPlaying] = useState(false);
-  const [url, setUrl] = useState("");
+  
+  // 🚀 ÇÖZÜM: İlk açılışta asla boş kalmaması için garanti bir link veriyoruz.
+  const [url, setUrl] = useState(videoUrl || "https://www.youtube.com/watch?v=aqz-KE-bpKQ");
   const [isReady, setIsReady] = useState(false);
 
-  // SUNUCUDAN GELEN KOMUTLARI DİNLE
+  // Ana sayfadaki arama çubuğundan (Değiştir butonundan) gelen yeni linki yakala
+  useEffect(() => {
+    if (videoUrl) {
+      setUrl(videoUrl);
+    }
+  }, [videoUrl]);
+
+  // SUNUCUDAN GELEN (DİĞER KULLANICILARIN) KOMUTLARINI DİNLE
   useEffect(() => {
     if (!socket) return;
 
@@ -25,7 +33,6 @@ export default function WatchPartyPlayer({ socket, partyId }) {
     socket.on('video_changed', (newUrl) => {
       setUrl(newUrl);
       setPlaying(false);
-      if (playerRef.current) playerRef.current.seekTo(0);
     });
 
     socket.on('play', (time) => {
@@ -56,7 +63,7 @@ export default function WatchPartyPlayer({ socket, partyId }) {
     };
   }, [socket]);
 
-  // KULLANICI ETKİLEŞİMLERİNİ SUNUCUYA GÖNDER
+  // SENİN YAPTIĞIN HAREKETLERİ SUNUCUYA (DİĞERLERİNE) GÖNDER
   const handlePlay = () => {
     setPlaying(true);
     if (socket && playerRef.current) {
@@ -81,7 +88,7 @@ export default function WatchPartyPlayer({ socket, partyId }) {
     <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black border-2 border-gray-700">
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center text-white z-10 bg-black">
-          ⏳ YouTube Bağlanıyor...
+          ⏳ YouTube Hazırlanıyor...
         </div>
       )}
       <ReactPlayer
