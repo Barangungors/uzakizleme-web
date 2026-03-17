@@ -5,31 +5,45 @@ import React, { useEffect, useRef, useState } from 'react';
 export default function ScreenShare({ socket, partyId }) {
   const [isSharing, setIsSharing] = useState(false);
   const [isReceiving, setIsReceiving] = useState(false);
+
+  // React State'leri: Görüntüleri havada kaybolmasın diye burada tutuyoruz
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
 
-  // WebRTC Ayarları (Google'ın ücretsiz STUN sunucuları, tünel kazmak için)
   const servers = {
     iceServers: [
       { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
     ]
   };
 
+  // 🚀 SİHİRLİ DOKUNUŞ: Görüntü hafızaya geldiği an, video etiketine güvenle bağla
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream, isSharing]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, isReceiving]);
+
   useEffect(() => {
     if (!socket) return;
 
-    // 1. Birisi Ekran Paylaşmak İstiyor (Teklif Geldi)
-    socket.on('webrtc_offer', async ({ offer, senderId }) => {
+    socket.on('webrtc_offer', async ({ offer }) => {
       setIsReceiving(true);
       const pc = new RTCPeerConnection(servers);
       peerConnection.current = pc;
 
-      // Karşı tarafın ekranı gelince videoya bas
+      // Görüntü geldiğinde doğrudan ekrana değil, hafızaya (State) al!
       pc.ontrack = (event) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
+        setRemoteStream(event.streams[0]);
       };
 
       pc.onicecandidate = (event) => {
@@ -40,20 +54,22 @@ export default function ScreenShare({ socket, partyId }) {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       
-      socket.emit('webrtc_answer', { partyId, answer }); // Cevabı gönder
+      socket.emit('webrtc_answer', { partyId, answer });
     });
 
-    // 2. Karşı Taraf Teklifimizi Kabul Etti (Cevap Geldi)
     socket.on('webrtc_answer', async ({ answer }) => {
       if (peerConnection.current) {
         await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
       }
     });
 
-    // 3. Tünel Kazma İşlemi (ICE Candidates)
     socket.on('webrtc_ice', async ({ candidate }) => {
       if (peerConnection.current) {
-        await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+        try {
+          await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.error("Bağlantı pürüzü:", e);
+        }
       }
     });
 
@@ -64,63 +80,66 @@ export default function ScreenShare({ socket, partyId }) {
     };
   }, [socket, partyId]);
 
-  // EKRAN PAYLAŞMA BUTONUNA BASILINCA ÇALIŞACAK FONKSİYON
   const startScreenShare = async () => {
     try {
-      // Tarayıcıdan ekran kaydı izni iste
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      setLocalStream(stream); // Kendi görüntümü hafızaya al
       setIsSharing(true);
-      
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
       const pc = new RTCPeerConnection(servers);
       peerConnection.current = pc;
 
-      // Ekranımın verisini tünele ekle
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
       pc.onicecandidate = (event) => {
         if (event.candidate) socket.emit('webrtc_ice', { partyId, candidate: event.candidate });
       };
 
-      // Odadakilere teklif gönder
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       socket.emit('webrtc_offer', { partyId, offer });
 
-      // Paylaşım durdurulursa her şeyi temizle
+      // Ekran paylaşımı Chrome'dan durdurulursa her şeyi temizle
       stream.getVideoTracks()[0].onended = () => {
         setIsSharing(false);
-        pc.close();
+        setLocalStream(null);
+        if (peerConnection.current) {
+          peerConnection.current.close();
+          peerConnection.current = null;
+        }
       };
     } catch (err) {
-      console.error("Ekran paylaşımı reddedildi veya hata:", err);
+      console.error("Ekran paylaşılamadı:", err);
     }
   };
 
   return (
-    <div className="w-full bg-gray-900 rounded-2xl border border-gray-800 p-4 mt-6">
+    <div className="w-full bg-gray-900 rounded-2xl border border-gray-800 p-4 mt-6 shadow-2xl">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-white font-bold text-lg">💻 Canlı Ekran Yayını</h3>
         {!isSharing && !isReceiving && (
-          <button onClick={startScreenShare} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition">
+          <button onClick={startScreenShare} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition duration-200">
             Ekranımı Paylaş (Go Live)
           </button>
         )}
-        {isSharing && <span className="text-green-500 font-bold animate-pulse">🔴 Yayındasın</span>}
-        {isReceiving && <span className="text-blue-500 font-bold animate-pulse">📺 Yayın İzleniyor</span>}
+        {isSharing && <span className="text-green-500 font-bold flex items-center gap-2"><span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span> Yayındasın</span>}
+        {isReceiving && <span className="text-blue-500 font-bold flex items-center gap-2"><span className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></span> Yayın İzleniyor</span>}
       </div>
 
       {/* Ekran Videolarının Görüneceği Alan */}
       {(isSharing || isReceiving) && (
-        <div className="w-full aspect-video bg-black rounded-lg overflow-hidden border-2 border-purple-500/50">
-          <video 
-            ref={isSharing ? localVideoRef : remoteVideoRef} 
-            autoPlay 
-            playsInline 
-            muted={isSharing} // Kendi sesimi kendim duymayayım
-            className="w-full h-full object-contain"
-          />
+        <div className="w-full aspect-video bg-black rounded-xl overflow-hidden border-2 border-purple-500/50 shadow-inner relative">
+          
+          {/* Eğer paylaşıyorsam kendi ekranımı göster */}
+          {isSharing && (
+            <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
+          )}
+
+          {/* Eğer izliyorsam karşı tarafın ekranını göster */}
+          {isReceiving && (
+            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain" />
+          )}
+
         </div>
       )}
     </div>
