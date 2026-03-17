@@ -1,3 +1,4 @@
+// server.js - TAM HALİ (Multi-Room & Auto-Host)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -11,49 +12,58 @@ io.on('connection', (socket) => {
   socket.on('join_party', ({ partyId, username }) => {
     socket.join(partyId);
     
+    // Oda yoksa oluştur
     if (!rooms[partyId]) {
       rooms[partyId] = {
         videoUrl: "https://www.youtube.com/watch?v=DzMrabVqiJE",
         isPlaying: false,
-        hostId: socket.id, // İlk giren Başkan (Host)
+        hostId: socket.id, // Odayı kuran ilk kişi başkandır
         users: []
       };
     }
 
     const room = rooms[partyId];
-    room.users.push({ id: socket.id, name: username || `Kullanıcı_${socket.id.slice(0,4)}` });
+    room.users.push({ id: socket.id, name: username || "Misafir" });
 
-    // Odaya giren herkese güncel listeyi ve durumu yolla
+    // Kullanıcıya odanın tüm bilgisini gönder
     io.to(partyId).emit('room_state', {
       videoUrl: room.videoUrl,
       isPlaying: room.isPlaying,
-      isHost: room.hostId === socket.id,
+      hostId: room.hostId, // Kimin sahip olduğu bilgisini herkes bilsin
       users: room.users
     });
   });
 
+  // VİDEO DEĞİŞTİRME (Herkes değiştirebilsin mi? Evet, butona basan yetkili olsun)
+  socket.on('change_video', ({ partyId, videoUrl }) => {
+    if (rooms[partyId]) {
+      rooms[partyId].videoUrl = videoUrl;
+      rooms[partyId].hostId = socket.id; // Videoyu değiştiren kişi yeni BAŞKAN olur! (Senin sorunun çözümü)
+      io.to(partyId).emit('video_changed', { videoUrl, hostId: socket.id });
+    }
+  });
+
   socket.on('play', ({ partyId, currentTime }) => {
-    if (rooms[partyId]?.hostId === socket.id) {
+    if (rooms[partyId] && rooms[partyId].hostId === socket.id) {
       socket.to(partyId).emit('play', currentTime);
     }
   });
 
   socket.on('pause', ({ partyId }) => {
-    if (rooms[partyId]?.hostId === socket.id) {
+    if (rooms[partyId] && rooms[partyId].hostId === socket.id) {
       socket.to(partyId).emit('pause');
     }
   });
 
   socket.on('disconnect', () => {
-    // Odalardan kullanıcıyı temizle
     for (const partyId in rooms) {
       rooms[partyId].users = rooms[partyId].users.filter(u => u.id !== socket.id);
       if (rooms[partyId].users.length === 0) {
         delete rooms[partyId];
       } else if (rooms[partyId].hostId === socket.id) {
-        // Sahip çıktıysa sıradaki kişiyi başkan yap
+        // Sahip çıkarsa sıradaki kişiyi başkan yap
         rooms[partyId].hostId = rooms[partyId].users[0].id;
-        io.to(partyId).emit('new_host', rooms[partyId].hostId);
+        io.to(partyId).emit('room_state', rooms[partyId]);
       }
     }
   });
