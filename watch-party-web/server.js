@@ -5,21 +5,26 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
+// CORS Ayarları: Vercel sitemizin sunucuya bağlanmasına izin veriyoruz
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: {
+    origin: "*", // Güvenlik için ileride buraya sadece vercel linkini yazabilirsin
+    methods: ["GET", "POST"]
+  }
 });
 
-// ODA HAFIZASI (Hangi odada hangi video, kaçıncı saniyede çalıyor)
+// 🧠 ODA HAFIZASI: Sunucu açık kaldığı sürece odaların durumunu burada tutar
 const rooms = {};
 
 io.on('connection', (socket) => {
-  console.log('✨ Yeni bağlantı:', socket.id);
+  console.log('✨ Bir kullanıcı bağlandı. ID:', socket.id);
 
-  // 1. ODAYA KATILMA VE YENİ GELENE SENKRONİZASYON (Madde 6)
+  // 1️⃣ ODAYA KATILMA (Room Logic)
   socket.on('join_party', ({ partyId }) => {
     socket.join(partyId);
-    
-    // Oda ilk kez açılıyorsa varsayılan değerleri oluştur
+    console.log(`👤 ${socket.id} şu odaya girdi: ${partyId}`);
+
+    // Oda hafızada yoksa oluştur (Varsayılan video ile başlat)
     if (!rooms[partyId]) {
       rooms[partyId] = {
         videoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
@@ -29,42 +34,47 @@ io.on('connection', (socket) => {
       };
     }
 
+    // 🔄 YENİ GELENİ SENKRONİZE ET (Madde 6)
     const room = rooms[partyId];
-    
-    // Eğer video şu an oynuyorsa, geçen süreyi hesaplayıp yeni gelene tam saniyeyi ver (Drift engelleme)
-    let calculatedTime = room.currentTime;
+    let syncTime = room.currentTime;
+
+    // Eğer video şu an oynuyorsa, geçen süreyi hesapla (Zaman kaymasını engelle)
     if (room.isPlaying) {
-      calculatedTime += (Date.now() - room.lastUpdatedAt) / 1000;
+      const elapsed = (Date.now() - room.lastUpdatedAt) / 1000;
+      syncTime += elapsed;
     }
 
-    // Yeni gelen kişiye odanın şu anki durumunu gönder
     socket.emit('room_state', {
       videoUrl: room.videoUrl,
       isPlaying: room.isPlaying,
-      currentTime: calculatedTime
+      currentTime: syncTime
     });
   });
 
-  // 2. VİDEO DEĞİŞTİRME (Madde 1)
+  // 2️⃣ VİDEO DEĞİŞTİRME (Madde 1, 3, 4)
   socket.on('change_video', ({ partyId, videoUrl }) => {
     if (rooms[partyId]) {
       rooms[partyId].videoUrl = videoUrl;
       rooms[partyId].currentTime = 0;
       rooms[partyId].isPlaying = false;
+      rooms[partyId].lastUpdatedAt = Date.now();
     }
+    // Odadaki herkese yeni videoyu bildir
     io.to(partyId).emit('video_changed', videoUrl);
   });
 
-  // 3. PLAY, PAUSE VE SEEK (Sarma) İŞLEMLERİ (Madde 2 ve 5)
+  // 3️⃣ PLAY (Oynat) KOMUTU
   socket.on('play', ({ partyId, currentTime }) => {
     if (rooms[partyId]) {
       rooms[partyId].isPlaying = true;
       rooms[partyId].currentTime = currentTime;
       rooms[partyId].lastUpdatedAt = Date.now();
     }
+    // Gönderen kişi hariç odadaki herkese "oynat" de
     socket.to(partyId).emit('play', currentTime);
   });
 
+  // 4️⃣ PAUSE (Durdur) KOMUTU
   socket.on('pause', ({ partyId, currentTime }) => {
     if (rooms[partyId]) {
       rooms[partyId].isPlaying = false;
@@ -74,6 +84,7 @@ io.on('connection', (socket) => {
     socket.to(partyId).emit('pause', currentTime);
   });
 
+  // 5️⃣ SEEK (Sarma) KOMUTU (Madde 5)
   socket.on('seek', ({ partyId, currentTime }) => {
     if (rooms[partyId]) {
       rooms[partyId].currentTime = currentTime;
@@ -82,12 +93,17 @@ io.on('connection', (socket) => {
     socket.to(partyId).emit('seek', currentTime);
   });
 
-  // Sohbet sistemi
+  // 💬 SOHBET SİSTEMİ
   socket.on('send_message', (data) => {
     io.to(data.partyId).emit('receive_message', data);
   });
+
+  socket.on('disconnect', () => {
+    console.log('❌ Bir kullanıcı ayrıldı.');
+  });
 });
 
+// Render veya Heroku gibi servisler için PORT ayarı
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Watch Party Sunucusu ${PORT} portunda hazır!`);
