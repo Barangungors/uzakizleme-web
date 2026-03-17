@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import WatchPartyPlayer from '@/components/WatchPartyPlayer';
 import ChatPanel from '@/components/ChatPanel';
+import ScreenShare from '@/components/ScreenShare';
 
 export default function Home() {
   const [socket, setSocket] = useState<any>(null);
@@ -107,6 +108,19 @@ export default function Home() {
         <div className="flex-1">
           <ChatPanel socket={socket} partyId={partyId} username={username} />
         </div>
+      </div>
+      <div className="w-full max-w-[1400px] flex flex-col lg:flex-row gap-6">
+        <div className="flex-[3]">
+          <WatchPartyPlayer socket={socket} videoUrl={videoUrl} partyId={partyId} hostId={hostId} />
+        </div>
+        <div className="flex-1">
+          <ChatPanel socket={socket} partyId={partyId} username={username} />
+        </div>
+      </div>
+
+      {/* 🚀 İŞTE YENİ EKRAN PAYLAŞIM ALANIMIZ */}
+      <div className="w-full max-w-[1400px]">
+        <ScreenShare socket={socket} partyId={partyId} />
       </div>
       
     </main>
