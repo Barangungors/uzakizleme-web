@@ -1,76 +1,111 @@
 // @ts-nocheck
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-import dynamic from 'next/dynamic';
-
-const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
 
 export default function WatchPartyPlayer({ socket, videoUrl, partyId, hostId }) {
   const playerRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [videoId, setVideoId] = useState("");
 
   const isHost = socket?.id === hostId;
 
+  // 1. YouTube API Yüklemesi ve Sunucu Emirleri (Rave Sistemi)
   useEffect(() => {
     setIsMounted(true);
-    if (!socket) return;
+    
+    // Linkten ID'yi çek
+    const id = videoUrl?.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([^&\n?#]+)/)?.[1];
+    if (id) setVideoId(id);
 
-    socket.on('command_play', (time) => {
-      // Saniye farkı 2'den fazlaysa atla (Sürekli başa sarmayı engeller)
-      if (playerRef.current && Math.abs(playerRef.current.getCurrentTime() - time) > 2) {
-        playerRef.current.seekTo(time, 'seconds');
+    // YouTube Iframe API Scriptini Ekle
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag?.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+
+    // Başkandan gelen senkronizasyon komutlarını dinle
+    if (socket) {
+      socket.on('command_play', (time) => {
+        if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
+          if (Math.abs(playerRef.current.getCurrentTime() - time) > 2) {
+            playerRef.current.seekTo(time, true);
+          }
+          playerRef.current.playVideo();
+        }
+      });
+      socket.on('command_pause', () => {
+        if (playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+          playerRef.current.pauseVideo();
+        }
+      });
+    }
+
+    return () => {
+      socket?.off('command_play');
+      socket?.off('command_pause');
+    };
+  }, [socket, videoUrl]);
+
+  // 2. Orijinal Yıkılmaz Oynatıcıyı Kurma
+  useEffect(() => {
+    if (!isMounted || !videoId) return;
+
+    const initPlayer = () => {
+      // Eğer oynatıcı zaten açıksa sadece videoyu değiştir (Sayfayı yenilemeden)
+      if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
+        playerRef.current.loadVideoById(videoId);
+        return;
       }
-      setPlaying(true);
-    });
 
-    socket.on('command_pause', () => setPlaying(false));
+      // İlk defa açılıyorsa yıkılmaz Iframe'i kur
+      playerRef.current = new window.YT.Player('youtube-player', {
+        videoId: videoId,
+        playerVars: { 
+          autoplay: 1, 
+          controls: isHost ? 1 : 0, // Sadece başkan kontrolleri görür
+          origin: typeof window !== 'undefined' ? window.location.origin : '',
+          playsinline: 1,
+          rel: 0
+        },
+        events: {
+          'onStateChange': (event) => {
+            if (!isHost || !socket) return;
+            const currentTime = playerRef.current.getCurrentTime();
+            // Başkan oynatır veya durdurursa herkese haber ver
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              socket.emit('play_video', { partyId, time: currentTime });
+            } else if (event.data === window.YT.PlayerState.PAUSED) {
+              socket.emit('pause_video', { partyId });
+            }
+          }
+        }
+      });
+    };
 
-    return () => { socket.off('command_play'); socket.off('command_pause'); };
-  }, [socket]);
+    // YouTube API'si hazırsa hemen kur, değilse hazır olmasını bekle
+    if (window.YT && window.YT.Player) {
+      initPlayer();
+    } else {
+      window.onYouTubeIframeAPIReady = initPlayer;
+    }
+  }, [isMounted, videoId, isHost, partyId, socket]);
 
-  if (!isMounted) return <div className="h-[500px] w-full bg-black rounded-2xl animate-pulse" />;
+  if (!isMounted) return <div className="h-[500px] w-full bg-black rounded-2xl flex items-center justify-center text-white font-bold">Oda Kuruluyor...</div>;
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden bg-black border-4 border-green-500 shadow-2xl h-[500px]">
-      <ReactPlayer
-        ref={playerRef}
-        url={videoUrl}
-        width="100%"
-        height="100%"
-        playing={playing}
-        controls={isHost} // Sadece Başkan kontrolleri görür
-        onPlay={() => {
-          if (isHost) {
-            setPlaying(true);
-            socket.emit('play_video', { partyId, time: playerRef.current?.getCurrentTime() });
-          }
-        }}
-        onPause={() => {
-          if (isHost) {
-            setPlaying(false);
-            socket.emit('pause_video', { partyId });
-          }
-        }}
-        // 🚀 MOBİL CİHAZLAR İÇİN HAYATİ AYARLAR
-        config={{
-          youtube: {
-            playerVars: { 
-              origin: typeof window !== 'undefined' ? window.location.origin : '',
-              playsinline: 1, // Telefondan girince tam ekrana fırlamasını engeller
-            }
-          }
-        }}
-        style={{ position: 'absolute', top: 0, left: 0 }}
-      />
-
-      {/* İZLEYİCİ İÇİN UYARI */}
+      
+      {/* İŞTE SENİN HATASIZ ÇALIŞAN ESKİ DOSTUN: HAM YOUTUBE DIV'İ */}
+      <div id="youtube-player" className="w-full h-full"></div>
+      
       {!isHost && (
         <div className="absolute top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg z-50">
-          👀 Sadece Başkan Kontrol Edebilir
+          👀 İzleyici Modu (Sadece Başkan Kontrol Edebilir)
         </div>
       )}
-      {!isHost && <div className="absolute inset-0 z-40 bg-transparent" />}
+      {!isHost && <div className="absolute inset-0 z-40 bg-transparent cursor-not-allowed" />}
     </div>
   );
 }
