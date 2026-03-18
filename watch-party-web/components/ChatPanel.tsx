@@ -1,13 +1,14 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-import { playSound } from '@/utils/sound'; // 🚀 Ses motorunu içeri aldık
+import { playSound } from '@/utils/sound'; // Ses motorumuz devrede
+
+// TypeScript için veri tiplerini tanımlıyoruz
 interface Message {
   sender: string;
   text: string;
-  time: string;
+  time?: string;
 }
 
-// 1. Props'ların (dışarıdan gelen verilerin) tipini tanımlıyoruz
 interface ChatPanelProps {
   socket: any;
   partyId: string;
@@ -22,10 +23,11 @@ export default function ChatPanel({ socket, partyId, username }: ChatPanelProps)
   useEffect(() => {
     if (!socket) return;
     
+    // Gelen mesajları dinle
     socket.on('receive_message', (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
       
-      // 🚀 EĞER MESAJI BEN ATMADIYSAM "POP" SESİ ÇAL
+      // Mesajı ben GÖNDERMEDİYSEM bildirim sesini çal
       if (msg.sender !== username) {
         playSound('message');
       }
@@ -34,7 +36,7 @@ export default function ChatPanel({ socket, partyId, username }: ChatPanelProps)
     return () => { socket.off('receive_message'); };
   }, [socket, username]);
 
-
+  // Yeni mesaj gelince ekranı otomatik olarak en alta kaydır
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -42,8 +44,12 @@ export default function ChatPanel({ socket, partyId, username }: ChatPanelProps)
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim() && socket) {
-      socket.emit('send_message', { partyId, sender: username, text: input });
-      setInput("");
+      // Mesajın atıldığı saati alıyoruz (Örn: 21:45)
+      const currentTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      
+      // Sunucuya mesajı iletiyoruz
+      socket.emit('send_message', { partyId, sender: username, text: input, time: currentTime });
+      setInput(""); // Gönderdikten sonra kutuyu temizle
     }
   };
 
@@ -51,7 +57,7 @@ export default function ChatPanel({ socket, partyId, username }: ChatPanelProps)
     <div className="flex flex-col h-full bg-gray-900 rounded-3xl border border-gray-800 overflow-hidden shadow-2xl">
       
       {/* SOHBET BAŞLIĞI */}
-      <div className="bg-gray-950 p-5 border-b border-gray-800">
+      <div className="bg-gray-950 p-5 border-b border-gray-800 flex justify-between items-center">
         <h3 className="text-white text-lg font-extrabold flex items-center gap-3">
           <span className="text-xl">💬</span> Oda Sohbeti
         </h3>
@@ -64,7 +70,9 @@ export default function ChatPanel({ socket, partyId, username }: ChatPanelProps)
           
           return (
             <div key={i} className={`flex flex-col ${isMyMessage ? 'items-end' : 'items-start'}`}>
-              <span className="text-xs text-gray-600 mb-1 font-medium">{msg.sender} • {msg.time}</span>
+              <span className="text-xs text-gray-500 mb-1 font-medium">
+                {msg.sender} {msg.time && `• ${msg.time}`}
+              </span>
               <div className={`px-5 py-3 rounded-xl max-w-[85%] text-sm leading-relaxed ${
                 isMyMessage 
                   ? 'bg-blue-600 text-white rounded-br-none shadow-blue-500/20 shadow-lg' 
@@ -75,6 +83,7 @@ export default function ChatPanel({ socket, partyId, username }: ChatPanelProps)
             </div>
           );
         })}
+        {/* En alta kaydırma hedefi */}
         <div ref={messagesEndRef} />
       </div>
 
