@@ -5,11 +5,8 @@ import React, { useEffect, useRef, useState } from 'react';
 export default function ScreenShare({ socket, partyId }) {
   const [isSharing, setIsSharing] = useState(false);
   const [isReceiving, setIsReceiving] = useState(false);
-
-  // React State'leri: Görüntüleri havada kaybolmasın diye burada tutuyoruz
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
@@ -20,7 +17,6 @@ export default function ScreenShare({ socket, partyId }) {
     ]
   };
 
-  // 🚀 SİHİRLİ DOKUNUŞ: Görüntü hafızaya geldiği an, video etiketine güvenle bağla
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
@@ -41,7 +37,6 @@ export default function ScreenShare({ socket, partyId }) {
       const pc = new RTCPeerConnection(servers);
       peerConnection.current = pc;
 
-      // Görüntü geldiğinde doğrudan ekrana değil, hafızaya (State) al!
       pc.ontrack = (event) => {
         setRemoteStream(event.streams[0]);
       };
@@ -83,7 +78,7 @@ export default function ScreenShare({ socket, partyId }) {
   const startScreenShare = async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      setLocalStream(stream); // Kendi görüntümü hafızaya al
+      setLocalStream(stream);
       setIsSharing(true);
 
       const pc = new RTCPeerConnection(servers);
@@ -99,7 +94,6 @@ export default function ScreenShare({ socket, partyId }) {
       await pc.setLocalDescription(offer);
       socket.emit('webrtc_offer', { partyId, offer });
 
-      // Ekran paylaşımı Chrome'dan durdurulursa her şeyi temizle
       stream.getVideoTracks()[0].onended = () => {
         setIsSharing(false);
         setLocalStream(null);
@@ -114,28 +108,27 @@ export default function ScreenShare({ socket, partyId }) {
   };
 
   return (
-    <div className="w-full bg-gray-900 rounded-2xl border border-gray-800 p-4 mt-6 shadow-2xl">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-white font-bold text-lg">💻 Canlı Ekran Yayını</h3>
+    <div className="w-full bg-[#050510]/60 backdrop-blur-xl rounded-3xl border border-cyan-500/30 p-4 mt-6 shadow-2xl z-10">
+      <div className="flex justify-between items-center mb-4 p-2">
+        <h3 className="text-white font-bold text-lg flex items-center gap-3">
+          <span className="text-cyan-400 text-xl">💻</span> Canlı Ekran Yayını
+        </h3>
         {!isSharing && !isReceiving && (
-          <button onClick={startScreenShare} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition duration-200">
-            Ekranımı Paylaş (Go Live)
+          <button onClick={startScreenShare} className="bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-[0_0_15px_rgba(6,182,212,0.3)] transition duration-200 text-sm uppercase tracking-widest">
+            Yayını Başlat
           </button>
         )}
-        {isSharing && <span className="text-green-500 font-bold flex items-center gap-2"><span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span> Yayındasın</span>}
-        {isReceiving && <span className="text-blue-500 font-bold flex items-center gap-2"><span className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></span> Yayın İzleniyor</span>}
+        {isSharing && <span className="text-green-400 font-bold flex items-center gap-2 text-sm uppercase tracking-widest"><span className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_#22c55e]"></span> Yayındasın</span>}
+        {isReceiving && <span className="text-cyan-400 font-bold flex items-center gap-2 text-sm uppercase tracking-widest"><span className="w-3 h-3 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_10px_#22d3ee]"></span> Yayın İzleniyor</span>}
       </div>
 
-      {/* Ekran Videolarının Görüneceği Alan */}
       {(isSharing || isReceiving) && (
-        <div className="w-full aspect-video bg-black rounded-xl overflow-hidden border-2 border-purple-500/50 shadow-inner relative">
+        <div className="w-full aspect-video bg-black/60 rounded-xl overflow-hidden border-2 border-cyan-500/50 shadow-inner relative z-10">
           
-          {/* Eğer paylaşıyorsam kendi ekranımı göster */}
           {isSharing && (
             <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
           )}
 
-          {/* Eğer izliyorsam karşı tarafın ekranını göster */}
           {isReceiving && (
             <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain" />
           )}

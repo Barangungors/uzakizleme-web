@@ -1,7 +1,7 @@
 "use client";
 import React from 'react';
 
-// 1. Gelecek verilerin kimliğini (tipini) tanımlıyoruz
+// TypeScript tipi (interface) tanımlaması
 interface User {
   id: string;
   name: string;
@@ -17,24 +17,22 @@ const StatusDot = ({ color }: { color: string }) => (
   <div className={`w-3 h-3 rounded-full ${color} flex-shrink-0`} />
 );
 
-
-
 export default function UserList({ users, hostId, myId }: UserListProps) {
   return (
-    <div className="bg-gray-900 rounded-3xl border border-gray-800 p-6 shadow-2xl flex flex-col h-full overflow-hidden">
+    <div className="bg-[#050510]/60 backdrop-blur-xl rounded-3xl border border-cyan-500/30 p-6 shadow-[0_0_20px_rgba(6,182,212,0.1)] flex flex-col h-full overflow-hidden z-10">
       
       {/* BAŞLIK VE KİŞİ SAYISI */}
-      <div className="flex justify-between items-center border-b border-gray-800 pb-4 mb-4">
+      <div className="flex justify-between items-center border-b border-cyan-800/50 pb-4 mb-4">
         <h3 className="text-white text-lg font-extrabold flex items-center gap-3">
           <span className="text-xl">👥</span> Odadakiler
         </h3>
-        <span className="text-xs font-bold bg-blue-600/10 text-blue-400 px-3 py-1.5 rounded-full border border-blue-600/30">
+        <span className="text-xs font-bold bg-cyan-600/10 text-cyan-400 px-3 py-1.5 rounded-full border border-cyan-600/30">
           {users?.length || 0} Çevrimiçi
         </span>
       </div>
       
       {/* KULLANICI LİSTESİ */}
-      <ul className="space-y-4 overflow-y-auto pr-3 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
+      <ul className="space-y-4 overflow-y-auto pr-3 scrollbar-thin scrollbar-thumb-cyan-900 scrollbar-track-transparent">
         {users?.map((user, index) => {
           const isYou = user.id === myId;
           const isHost = user.id === hostId;
@@ -47,7 +45,7 @@ export default function UserList({ users, hostId, myId }: UserListProps) {
                 
                 <span className="text-white text-sm font-semibold truncate flex items-center gap-2">
                   {user.name} 
-                  {isYou && <span className="text-xs text-gray-600 font-normal">(Sen)</span>}
+                  {isYou && <span className="text-xs text-cyan-600 font-normal">(Sen)</span>}
                 </span>
               </div>
               
