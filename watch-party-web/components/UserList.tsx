@@ -23,7 +23,7 @@ export default function UserList({ users, hostId, myId }: UserListProps) {
       
       {/* BAŞLIK VE KİŞİ SAYISI */}
       <div className="flex justify-between items-center border-b border-cyan-800/50 pb-4 mb-4">
-        <h3 className="text-white text-lg font-extrabold flex items-center gap-3">
+        <h3 className="text-white text-lg font-extrabold flex items-center gap-3 tracking-widest uppercase">
           <span className="text-xl">👥</span> Odadakiler
         </h3>
         <span className="text-xs font-bold bg-cyan-600/10 text-cyan-400 px-3 py-1.5 rounded-full border border-cyan-600/30">
@@ -39,7 +39,7 @@ export default function UserList({ users, hostId, myId }: UserListProps) {
           
           return (
             <li key={index} className="flex justify-between items-center gap-4 py-1">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 overflow-hidden">
                 {/* Durum Noktası: Sen=Yeşil, Diğerleri=Gri */}
                 <StatusDot color={isYou ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-gray-500'} />
                 
