@@ -19,7 +19,7 @@ export default function Home() {
   const [joined, setJoined] = useState(false);
 
   // Oda İçi State'ler
-  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=DzMrabVqiJE");
+  const [videoUrl, setVideoUrl] = useState("");
   const [inputUrl, setInputUrl] = useState("");
   const [hostId, setHostId] = useState("");
   const [users, setUsers] = useState<{id: string, name: string}[]>([]);
