@@ -9,33 +9,45 @@ import { playSound } from '@/utils/sound';
 
 export default function Home() {
   const [socket, setSocket] = useState<any>(null);
-  const [partyId, setPartyId] = useState("");
+  
+  // Lobi State'leri
   const [username, setUsername] = useState("");
+  const [partyId, setPartyId] = useState("");
+  const [password, setPassword] = useState("");
+  const [activeRooms, setActiveRooms] = useState<{id: string, userCount: number, hasPassword: boolean}[]>([]);
+  const [joinError, setJoinError] = useState("");
   const [joined, setJoined] = useState(false);
+
+  // Oda İçi State'ler
   const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=DzMrabVqiJE");
   const [inputUrl, setInputUrl] = useState("");
   const [hostId, setHostId] = useState("");
   const [users, setUsers] = useState<{id: string, name: string}[]>([]);
-  
-  // 🚀 Odadaki kişi sayısını hafızada tutmak için (Ses çalma kontrolü)
   const prevUserCount = useRef(0);
 
   useEffect(() => {
-    // Senin 7/24 açık canlı Render sunucun
     const newSocket = io('https://watch-party-backend-84du.onrender.com');
     setSocket(newSocket);
     
+    // LOBİ: Aktif odaları al
+    newSocket.on('active_rooms', (rooms) => setActiveRooms(rooms));
+    
+    // LOBİ: Şifre hatası alırsak
+    newSocket.on('join_error', (msg) => setJoinError(msg));
+    
+    // LOBİ: Başarıyla girersek
+    newSocket.on('join_success', () => {
+      setJoinError("");
+      setJoined(true);
+    });
+
+    // ODA İÇİ: Durum güncellemeleri
     newSocket.on('room_state', (data) => {
       setVideoUrl(data.videoUrl);
       setHostId(data.hostId);
-      
       if (data.users) {
-        // 🔔 Odaya YENİ biri girdiyse (ve ilk açılış değilse) "Ding-Dong" çal
-        if (prevUserCount.current > 0 && data.users.length > prevUserCount.current) {
-          playSound('join');
-        }
-        
-        prevUserCount.current = data.users.length; // Sayıyı güncelle
+        if (prevUserCount.current > 0 && data.users.length > prevUserCount.current) playSound('join');
+        prevUserCount.current = data.users.length;
         setUsers(data.users);
       }
     });
@@ -51,8 +63,8 @@ export default function Home() {
   const handleJoin = (e: any) => {
     e.preventDefault();
     if (partyId && username && socket) {
-      socket.emit('join_party', { partyId, username });
-      setJoined(true);
+      // Şifre ile birlikte sunucuya istek at
+      socket.emit('join_party', { partyId, username, password });
     }
   };
 
@@ -63,79 +75,130 @@ export default function Home() {
     }
   };
 
-  // --- GİRİŞ EKRANI ---
+  const isHost = socket?.id === hostId;
+
+  // ==========================================
+  // 1. FÜTÜRİSTİK LOBİ EKRANI (Odalar ve Şifre)
+  // ==========================================
   if (!joined) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <form onSubmit={handleJoin} className="bg-gray-900 p-10 rounded-3xl border border-gray-800 shadow-2xl w-full max-w-md">
-          <h2 className="text-2xl text-white font-extrabold mb-8 text-center flex items-center justify-center gap-3">
-            <span className="text-3xl">🍿</span> Watch Party'ye Katıl
-          </h2>
-          <input 
-            type="text" placeholder="Adınız" value={username} onChange={(e) => setUsername(e.target.value)}
-            className="w-full bg-gray-800 text-white p-4 rounded-xl mb-5 outline-none border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition" required
-          />
-          <input 
-            type="text" placeholder="Oda Adı (Örn: baran-vip)" value={partyId} onChange={(e) => setPartyId(e.target.value)}
-            className="w-full bg-gray-800 text-white p-4 rounded-xl mb-8 outline-none border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition" required
-          />
-          <button className="w-full bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-xl font-bold transition duration-200 shadow-lg">Giriş Yap</button>
-        </form>
+      <div className="min-h-screen bg-[#050510] flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Arka Plan Neon Işıkları */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-600/20 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full"></div>
+
+        <div className="w-full max-w-[1000px] grid grid-cols-1 md:grid-cols-2 gap-8 z-10">
+          
+          {/* SOL: ODA KUR / KATIL FORMU */}
+          <form onSubmit={handleJoin} className="bg-white/[0.03] backdrop-blur-2xl p-8 rounded-3xl border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.15)]">
+            <h2 className="text-3xl font-black mb-8 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 text-center tracking-wider uppercase">
+              Sisteme Bağlan
+            </h2>
+            
+            {joinError && <div className="bg-red-900/50 border border-red-500 text-red-300 p-3 rounded-lg mb-4 text-sm font-bold animate-pulse text-center">{joinError}</div>}
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-cyan-400 text-xs font-bold uppercase tracking-widest mb-1 block">Kullanıcı Adı</label>
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required
+                  className="w-full bg-black/50 text-white px-5 py-4 rounded-xl border border-cyan-900 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all placeholder-gray-600" placeholder="Ajan_Baran" />
+              </div>
+              <div>
+                <label className="text-cyan-400 text-xs font-bold uppercase tracking-widest mb-1 block">Oda Kodu</label>
+                <input type="text" value={partyId} onChange={(e) => setPartyId(e.target.value)} required
+                  className="w-full bg-black/50 text-white px-5 py-4 rounded-xl border border-cyan-900 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all placeholder-gray-600" placeholder="Hedef_Oda_01" />
+              </div>
+              <div>
+                <label className="text-cyan-400 text-xs font-bold uppercase tracking-widest mb-1 block">Şifre (İsteğe Bağlı)</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-black/50 text-white px-5 py-4 rounded-xl border border-cyan-900 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all placeholder-gray-600" placeholder="Boş bırakırsan şifresiz kurulur" />
+              </div>
+            </div>
+
+            <button className="w-full mt-8 bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 text-white p-4 rounded-xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all hover:scale-[1.02]">
+              Bağlantıyı Başlat
+            </button>
+          </form>
+
+          {/* SAĞ: AKTİF ODALAR LİSTESİ */}
+          <div className="bg-white/[0.02] backdrop-blur-md p-8 rounded-3xl border border-purple-500/20 shadow-2xl flex flex-col max-h-[550px]">
+            <h3 className="text-xl font-bold mb-6 text-purple-400 flex items-center gap-3 tracking-widest uppercase">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Aktif Ağlar
+            </h3>
+            
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-purple-900 scrollbar-track-transparent">
+              {activeRooms.length === 0 ? (
+                <div className="text-gray-500 text-center mt-10 text-sm font-medium">Sistemde açık oda bulunamadı. Yeni bir tane kur.</div>
+              ) : (
+                activeRooms.map((room) => (
+                  <div key={room.id} onClick={() => setPartyId(room.id)} 
+                    className="bg-black/40 border border-purple-900/50 p-4 rounded-xl cursor-pointer hover:border-purple-400 hover:bg-purple-900/20 transition group flex justify-between items-center">
+                    <div>
+                      <div className="text-white font-bold group-hover:text-purple-300 transition">{room.id}</div>
+                      <div className="text-xs text-gray-500 mt-1">{room.userCount} Kullanıcı İçeride</div>
+                    </div>
+                    {room.hasPassword ? (
+                      <span className="text-red-400 text-lg" title="Şifreli Oda">🔒</span>
+                    ) : (
+                      <span className="text-green-400 text-lg" title="Açık Oda">🔓</span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const isHost = socket?.id === hostId;
-
-  // --- ANA ODA EKRANI ---
+  // ==========================================
+  // 2. FÜTÜRİSTİK ANA ODA EKRANI
+  // ==========================================
   return (
-    <main className="min-h-screen bg-gray-950 p-6 md:p-10 flex flex-col items-center">
+    <main className="min-h-screen bg-[#050510] p-6 md:p-10 flex flex-col items-center relative overflow-hidden">
       
-      {/* Üst Bilgi Barı */}
-      <div className="w-full max-w-[1500px] flex justify-between items-center mb-8 bg-gray-900 p-5 rounded-3xl border border-gray-800 shadow-xl">
-        <h1 className="text-2xl text-white font-black tracking-tight flex items-center gap-3">
-          🎬 ODA <span className="text-gray-700">|</span> <span className="text-blue-400 font-bold">{partyId}</span>
+      {/* Arka plan ışıkları */}
+      <div className="absolute top-0 left-1/4 w-[50%] h-[30%] bg-cyan-900/10 blur-[150px] pointer-events-none"></div>
+
+      {/* Üst Bilgi Barı (Glassmorphism) */}
+      <div className="w-full max-w-[1500px] flex justify-between items-center mb-8 bg-white/[0.03] backdrop-blur-xl p-5 rounded-3xl border border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)] z-10">
+        <h1 className="text-xl text-white font-black tracking-widest uppercase flex items-center gap-3">
+          AĞ <span className="text-cyan-800">/</span> <span className="text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]">{partyId}</span>
         </h1>
-        <button onClick={() => window.location.reload()} className="text-gray-400 hover:text-white transition font-bold text-sm bg-gray-800 hover:bg-red-600 px-6 py-2.5 rounded-full border border-gray-700">
-          Odadan Çık 🚪
+        <button onClick={() => window.location.reload()} className="text-cyan-200 hover:text-white transition font-bold text-xs uppercase tracking-widest bg-red-900/30 hover:bg-red-600/80 px-6 py-3 rounded-xl border border-red-500/30">
+          Bağlantıyı Kes
         </button>
       </div>
 
-      {/* Video Değiştirme ve Güvenlik Kilidi Alanı */}
-      <div className="w-full max-w-[1500px] mb-8">
+      {/* Video Değiştirme (Başkan Kontrolü) */}
+      <div className="w-full max-w-[1500px] mb-8 z-10">
         {isHost ? (
-          <div className="flex gap-4 p-4 bg-gray-900 rounded-3xl border border-gray-800 shadow-xl animate-fade-in">
+          <div className="flex gap-4 p-4 bg-white/[0.02] backdrop-blur-md rounded-2xl border border-cyan-500/20 shadow-xl">
             <input 
-              type="text" placeholder="YouTube Linkini Yapıştır ve Değiştir..." value={inputUrl} onChange={(e) => setInputUrl(e.target.value)}
-              className="flex-1 bg-gray-800 text-white px-5 py-3 rounded-full outline-none border border-gray-700 focus:border-blue-500 transition"
+              type="text" placeholder="Hedef URL Giriniz..." value={inputUrl} onChange={(e) => setInputUrl(e.target.value)}
+              className="flex-1 bg-black/60 text-cyan-50 px-5 py-3 rounded-xl outline-none border border-cyan-900/50 focus:border-cyan-400 transition placeholder-gray-600 text-sm"
             />
-            <button onClick={changeVideo} className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-full font-bold transition shadow-xl text-sm">
-              Videoyu Değiştir
+            <button onClick={changeVideo} className="bg-cyan-600 hover:bg-cyan-500 text-white px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] transition">
+              Senkronize Et
             </button>
           </div>
         ) : (
-          <div className="bg-gray-900 p-5 rounded-3xl border border-red-900/50 text-center text-red-400 font-bold text-sm tracking-wide shadow-xl">
-            🔒 Yalnızca oda başkanı videoyu değiştirebilir.
+          <div className="bg-red-900/10 backdrop-blur-md p-4 rounded-2xl border border-red-500/20 text-center text-red-400 font-bold text-xs uppercase tracking-widest shadow-xl">
+            🔒 Yalnızca ağ yöneticisi hedefi değiştirebilir.
           </div>
         )}
       </div>
 
-      {/* Video, Ekran Paylaşımı, Kullanıcı Listesi ve Sohbet Panelleri */}
-      <div className="w-full max-w-[1500px] grid grid-cols-1 lg:grid-cols-4 gap-8">
-        
-        {/* SOL TARAF: VİDEO OYNATICI VE EKRAN PAYLAŞIMI (Geniş Alan) */}
+      {/* İçerik Panelleri */}
+      <div className="w-full max-w-[1500px] grid grid-cols-1 lg:grid-cols-4 gap-8 z-10">
         <div className="col-span-1 lg:col-span-3 flex flex-col gap-8">
           <WatchPartyPlayer socket={socket} videoUrl={videoUrl} partyId={partyId} hostId={hostId} />
-          
           <ScreenShare socket={socket} partyId={partyId} />
         </div>
         
-        {/* SAĞ TARAF: KULLANICI LİSTESİ VE SOHBET (Tam Sidebar) */}
         <div className="col-span-1 lg:col-span-1 flex flex-col gap-8 h-full max-h-[850px]">
-          {/* UserList paneli */}
           <UserList users={users} hostId={hostId} myId={socket?.id} />
-          
-          {/* ChatPanel paneli */}
           <div className="flex-1 overflow-hidden">
             <ChatPanel socket={socket} partyId={partyId} username={username} />
           </div>
